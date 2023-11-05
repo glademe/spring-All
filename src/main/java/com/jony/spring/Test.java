@@ -1,7 +1,7 @@
 package com.jony.spring;
 
 import com.jony.spring.config.AppConfig;
-import com.jony.spring.service.UserService;
+import com.jony.spring.service.BaseService;
 
 /**
  * @author :Jooye
@@ -12,7 +12,7 @@ public class Test {
     public static void main(String[] args) throws ClassNotFoundException {
         ApplicationContext applicationContext = new ApplicationContext(AppConfig.class);
 
-        UserService userService = (UserService) applicationContext.getBean("userService");
+        BaseService userService = (BaseService) applicationContext.getBean("userService");
         userService.test();
 
 

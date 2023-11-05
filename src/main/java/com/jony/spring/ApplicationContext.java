@@ -9,9 +9,7 @@ import java.beans.Introspector;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author :Jooye
@@ -23,6 +21,9 @@ public class ApplicationContext {
 
     Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
     Map<String, Object> singleObjects = new HashMap<>();
+
+
+    List<BeanPostProcessor> postProcessorList = new ArrayList<>();
 
     private Class targetCLass;
 
@@ -48,6 +49,7 @@ public class ApplicationContext {
                 singleObjects.put(key, bean);
             }
         }
+
     }
 
     private Object createBean(String key, BeanDefinition beanDefinition) {
@@ -66,6 +68,29 @@ public class ApplicationContext {
                     field.set(instance, getBean(field.getName()));
                 }
             }
+
+            //Aware接口执行
+            if (instance instanceof BeanNameAware) {
+                ((BeanNameAware) (instance)).setBeanName(key);
+            }
+
+
+            //初始化之前
+            for (BeanPostProcessor beanPostProcessor : postProcessorList) {
+                instance = beanPostProcessor.postProcessBeforeInitialization(instance, key);
+            }
+
+
+            //初始化Bean
+            if (instance instanceof InitializingBean) {
+                ((InitializingBean) instance).afterPropertiesSet();
+            }
+
+            //初始化之后
+            for (BeanPostProcessor beanPostProcessor : postProcessorList) {
+                instance = beanPostProcessor.postProcessAfterInitialization(instance, key);
+            }
+
             return instance;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -97,6 +122,15 @@ public class ApplicationContext {
                         if (hasComponent) {
                             Component componentAnnotation = aClass.getAnnotation(Component.class);
                             String beanName = componentAnnotation.value();
+                            //加载BeanPostProcessor
+                            if (BeanPostProcessor.class.isAssignableFrom(aClass)) {
+                                try {
+                                    BeanPostProcessor beanPostProcessor = (BeanPostProcessor) aClass.getConstructor().newInstance();
+                                    postProcessorList.add(beanPostProcessor);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
                             if ("".equals(beanName)) {
                                 beanName = Introspector.decapitalize(aClass.getSimpleName());
                             }
