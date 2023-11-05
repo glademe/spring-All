@@ -1,11 +1,13 @@
 package com.jony.spring;
 
+import com.jony.spring.annotation.Autowired;
 import com.jony.spring.annotation.Component;
 import com.jony.spring.annotation.ComponentScan;
 import com.jony.spring.annotation.Scope;
 
+import java.beans.Introspector;
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,17 +52,22 @@ public class ApplicationContext {
 
     private Object createBean(String key, BeanDefinition beanDefinition) {
         Class beanClass = beanDefinition.getBeanClass();
+        Object instance;
         try {
             //无参构造创建对象
-            Object object = beanClass.getConstructor().newInstance();
-            return object;
-        } catch (InstantiationException e) {
-            throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        } catch (InvocationTargetException e) {
-            throw new RuntimeException(e);
-        } catch (NoSuchMethodException e) {
+            instance = beanClass.getConstructor().newInstance();
+            //依赖注入 DI
+            Field[] fields = beanClass.getDeclaredFields();
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(Autowired.class)) {
+                    //属性
+                    field.setAccessible(true);
+                    //反射设置值
+                    field.set(instance, getBean(field.getName()));
+                }
+            }
+            return instance;
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -90,21 +97,22 @@ public class ApplicationContext {
                         if (hasComponent) {
                             Component componentAnnotation = aClass.getAnnotation(Component.class);
                             String beanName = componentAnnotation.value();
+                            if ("".equals(beanName)) {
+                                beanName = Introspector.decapitalize(aClass.getSimpleName());
+                            }
                             BeanDefinition beanDefinition = new BeanDefinition();
                             beanDefinition.setBeanClass(aClass);
-
                             if (hasScope) {
                                 Scope scopeAnnotation = aClass.getAnnotation(Scope.class);
                                 String scopeValue = scopeAnnotation.value();
                                 //单例
                                 if (scopeValue.equals("singleton")) {
                                     beanDefinition.setScope("singleton");
-
-
                                 } else if (scopeValue.equals("prototype")) {
                                     beanDefinition.setScope("prototype");
                                 }
                             }
+                            beanDefinition.setBeanName(beanName);
                             //存储BeanDefinition
                             beanDefinitionMap.put(beanName, beanDefinition);
                         }
@@ -128,9 +136,15 @@ public class ApplicationContext {
         }
         BeanDefinition beanDefinition = beanDefinitionMap.get(beanName);
         if (beanDefinition.getScope().equals("singleton")) {
-            return singleObjects.get(beanName);
+            Object singleBean = singleObjects.get(beanName);
+            if (singleBean == null) {
+                singleBean = createBean(beanName, beanDefinition);
+                singleObjects.put(beanName, beanDefinition);
+            }
+            return singleBean;
         } else if (beanDefinition.getScope().equals("prototype")) {
-            return createBean(beanName, beanDefinition);
+            Object bean = createBean(beanName, beanDefinition);
+            return bean;
         }
         return null;
     }

@@ -9,6 +9,6 @@ import com.jony.spring.annotation.Scope;
  * @Describe: 类的描述信息
  */
 @Component("orderService")
-@Scope("prototype")
+@Scope("singleton")
 public class OrderService {
 }
